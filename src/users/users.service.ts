@@ -14,21 +14,20 @@ export class UsersService {
   constructor(private prismaService: PrismaService) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    try {
-      const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
 
-      const user = await this.prismaService.user.create({
-        data: {
-          ...createUserDto,
-          password: hashedPassword,
-        },
-      });
+    const user = await this.prismaService.user.create({
+      data: {
+        ...createUserDto,
+        password: hashedPassword,
+      },
+    });
 
-      return user;
-    } catch (error) {
-      console.error(error);
-      throw new InternalServerErrorException('Error during user signup');
+    if (!user) {
+      throw new InternalServerErrorException('Error creating user');
     }
+
+    return user;
   }
 
   async findAll(): Promise<User[]> {

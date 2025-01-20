@@ -24,7 +24,7 @@ export class LoginDto {
     message: 'Password cannot be longer than 255 characters.',
   })
   @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/,
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$!%*?&])[A-Za-z\d@#$!%*?&]{6,}$/,
     {
       message:
         'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.',

@@ -4,7 +4,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { UsersService } from 'src/users/users.service';
 import { ConfigService } from '@nestjs/config';
-import { User } from '@prisma/client';
+import { UserEntity } from 'src/users/entities/user.entity';
 
 interface JwtPayload {
   userId: string;
@@ -19,10 +19,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       secretOrKey: configService.get<string>('JWT_SECRET'),
+      ignoreExpiration: false,
     });
   }
 
-  async validate(payload: JwtPayload): Promise<User> {
+  async validate(payload: JwtPayload): Promise<UserEntity> {
     try {
       const user = await this.usersService.findOne({ id: payload.userId });
 
@@ -30,9 +31,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         throw new UnauthorizedException('Invalid token or user not found');
       }
 
-      return user;
+      return new UserEntity(user);
     } catch (error) {
-      console.error(error);
+      console.error(`Error validating JWT: ${error}`);
       throw new UnauthorizedException('Authentication failed');
     }
   }
