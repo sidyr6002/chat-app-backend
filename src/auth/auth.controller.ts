@@ -1,31 +1,77 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { AuthEntity } from './entities/auth.entity';
-import { LoginDto } from './dto/login.dto';
+import { SingInDto } from './dto/signin-request.dto';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { Request, Response } from 'express';
+import { AccessTokenDto } from './dto/access-token.dto';
+import { ConfigService } from '@nestjs/config';
+import { SignUpResponseDto } from './dto/signup-response.dto';
 
 @Controller('auth')
 @ApiTags('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
-  @ApiCreatedResponse({ type: AuthEntity })
+  @ApiCreatedResponse({ type: SignUpResponseDto })
   @Post('signup')
   signUp(@Body() createUserDto: CreateUserDto) {
     return this.authService.signUp(createUserDto);
   }
 
-  @ApiOkResponse({ type: AuthEntity })
+  @ApiOkResponse({ type: AccessTokenDto })
   @Post('signin')
-  login(@Body() loginDto: LoginDto): Promise<AuthEntity> {
-    return this.authService.signIn(loginDto.email, loginDto.password);
+  async login(
+    @Body() signInDto: SingInDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AccessTokenDto> {
+    const { accessToken, refreshToken } = await this.authService.signIn(
+      signInDto.email,
+      signInDto.password,
+    );
+
+    res.cookie('myRefreshToken', refreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return { accessToken };
   }
 
-  @ApiOkResponse({ type: AuthEntity })
+  @ApiOkResponse({ type: AccessTokenDto })
   @Post('refresh')
-  refresh(@Body() refreshTokenDto: RefreshTokenDto): Promise<AuthEntity> {
-    return this.authService.refresh(refreshTokenDto.refreshToken);
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AccessTokenDto> {
+    const refreshToken: string = req.cookies?.refreshToken;
+    if (!refreshToken) {
+      console.log('Refresh token not found');
+      throw new UnauthorizedException('Refresh token not found');
+    }
+
+    const { accessToken, refreshToken: newRefreshToken } =
+      await this.authService.refresh(refreshToken);
+
+    res.cookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return { accessToken };
   }
 }

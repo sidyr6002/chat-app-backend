@@ -13,11 +13,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 model User {
   id                        String    @id @default(cuid())
   username                  String    @unique
   email                     String    @unique
   password                  String
+
+  sentDirectMessages        DirectMessage[]  @relation("Sender")
+  receivedDirectMessages    DirectMessage[]  @relation("Receiver")
+  sentGroupMessages         GroupMessage[]
+
+  conversationAsUser1       Conversation[]   @relation("User1")
+  conversationAsUser2       Conversation[]   @relation("User2")
+  groupMemberships          GroupMember[]
 
   refreshTokens             RefreshToken[]
 
@@ -34,4 +47,77 @@ model RefreshToken {
 
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model Conversation {
+  id          String   @id @default(cuid())
+  userId1     String
+  userId2     String
+  createdAt   DateTime @default(now())
+
+  messages    DirectMessage[]  
+  user1       User     @relation("User1", fields: [userId1], references: [id])
+  user2       User     @relation("User2", fields: [userId2], references: [id])
+
+  @@unique([userId1, userId2])
+}
+
+model DirectMessage {
+  id          String   @id @default(cuid())
+  content     String
+
+  senderId    String
+  receiverId  String
+  conversationId String
+
+  createdAt   DateTime @default(now())
+  
+  sender   User @relation("Sender", fields: [senderId], references: [id])
+  receiver User @relation("Receiver", fields: [receiverId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([createdAt])
+  @@index([senderId, receiverId])
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members    GroupMember[]
+  messages   GroupMessage[]
+}
+
+model GroupMember {
+  userId    String
+  groupId   String
+
+  role      Role  @default(USER)
+  joinedAt  DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  group     Group    @relation(fields: [groupId], references: [id])
+
+  @@id([userId, groupId])
+}
+
+model GroupMessage {
+  id          String   @id @default(cuid())
+  content     String
+
+  senderId    String
+  sender   User @relation(fields: [senderId], references: [id])
+
+  groupId     String
+  group     Group    @relation(fields: [groupId], references: [id])
+
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
 }

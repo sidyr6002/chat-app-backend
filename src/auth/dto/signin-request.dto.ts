@@ -8,7 +8,7 @@ import {
   MinLength,
 } from 'class-validator';
 
-export class LoginDto {
+export class SingInDto {
   @ApiProperty()
   @IsNotEmpty({ message: 'Email is required and cannot be empty.' })
   @IsEmail()

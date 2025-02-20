@@ -11,6 +11,10 @@ export class CreateUserDto {
   @ApiProperty()
   @IsNotEmpty({ message: 'Username is required and cannot be empty.' })
   @IsString()
+  @Matches(/^[a-zA-Z][a-zA-Z0-9_]{3,15}$/, {
+    message:
+      'Username must start with a letter, contain only letters, numbers, and underscores, and be between 4 and 16 characters long.',
+  })
   username: string;
 
   @ApiProperty()

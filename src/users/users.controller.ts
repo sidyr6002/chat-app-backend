@@ -21,12 +21,12 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller('users')
 @ApiTags('users')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOkResponse({ type: UserEntity, isArray: true })
   async findAll() {
     const users = await this.usersService.findAll();
@@ -34,8 +34,6 @@ export class UsersController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOkResponse({ type: UserEntity })
   async findOneById(@Param('id', CuidValidatePipe) id: string) {
     const user = await this.usersService.findOne({ id });
@@ -43,8 +41,6 @@ export class UsersController {
   }
 
   @Get('email/:email')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOkResponse({ type: UserEntity })
   async findOneByEmail(@Param('email') email: string) {
     const user = await this.usersService.findOne({ email });
@@ -52,8 +48,6 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiCreatedResponse({ type: UserEntity })
   async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     const user = await this.usersService.update({ id }, updateUserDto);
@@ -61,8 +55,6 @@ export class UsersController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOkResponse({ type: UserEntity })
   async remove(@Param('id') id: string) {
     const user = await this.usersService.remove({ id });

@@ -87,21 +87,24 @@ export class AuthService {
     }
 
     const payload = { userId: user.id };
-
+    const newAccessToken = this.jwtService.sign(payload);
     const newRefreshToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: '7d',
     });
 
-    await this.prismaService.refreshToken.update({
+    // Invalidate the old refresh token and create a new one
+    await this.prismaService.refreshToken.delete({
       where: { id: refreshToken.id },
+    });
+
+    await this.prismaService.refreshToken.create({
       data: {
         token: newRefreshToken,
+        userId: user.id,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
-
-    const newAccessToken = this.jwtService.sign(payload);
 
     return {
       accessToken: newAccessToken,
