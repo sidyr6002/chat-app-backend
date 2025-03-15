@@ -1,9 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { UserEntity } from 'src/users/entities/user.entity';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class ConversationsService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly userService: UsersService,
+  ) {}
 
   /**
    * Creates a new conversation or retrieves an existing one between two users.
@@ -15,7 +20,9 @@ export class ConversationsService {
    */
   async createOrGetConversation(currentUserId: string, participantId: string) {
     if (currentUserId === participantId) {
-      throw new Error('You cannot create a conversation with yourself');
+      throw new BadRequestException(
+        'You cannot create a conversation with yourself',
+      );
     }
 
     const [userId1, userId2] =
@@ -54,6 +61,46 @@ export class ConversationsService {
   }
 
   /**
+   * Retrieves a list of conversations for the current user.
+   *
+   * @param currentUserId - The ID of the current user whose conversations are to be retrieved.
+   * @throws {Error} - Throws an error if no conversations are found for the user.
+   * @returns An array of conversations, each including the other participant and last message details.
+   */
+  async getConversationsList(currentUserId: string) {
+    const conversations = await this.prismaService.conversation.findMany({
+      where: {
+        OR: [
+          {
+            userId1: currentUserId,
+          },
+          {
+            userId2: currentUserId,
+          },
+        ],
+      },
+      include: {
+        user1: true,
+        user2: true,
+        lastMessage: true,
+      },
+    });
+
+    if (!conversations) {
+      throw new Error('Conversations not found');
+    }
+
+    return conversations.map(({ user1, user2, userId1, userId2, ...rest }) => {
+      void userId2;
+
+      return {
+        ...rest,
+        participant: new UserEntity(userId1 === currentUserId ? user2 : user1),
+      };
+    });
+  }
+
+  /**
    * Retrieves a specific conversation by its ID and ensures the current user is a participant.
    *
    * @param currentUserId - The ID of the current user requesting the conversation.
@@ -83,6 +130,45 @@ export class ConversationsService {
     }
 
     return conversation;
+  }
+
+  async getConversationsListWithLastMessage(currentUserId: string) {
+    const conversations = await this.prismaService.conversation.findMany({
+      where: {
+        OR: [
+          {
+            userId1: currentUserId,
+          },
+          {
+            userId2: currentUserId,
+          },
+        ],
+      },
+      include: {
+        lastMessage: true,
+        user1: true,
+        user2: true,
+      },
+      orderBy: {
+        lastMessage: {
+          createdAt: 'desc',
+        },
+      },
+    });
+
+    return conversations.map((conversation) => {
+      const otherParticipant =
+        conversation.userId1 === currentUserId
+          ? conversation.user2
+          : conversation.user1;
+
+      return {
+        conversationId: conversation.id,
+        participant: otherParticipant,
+        lastMessage: conversation.lastMessage,
+        createdAt: conversation.createdAt,
+      };
+    });
   }
 
   /**
@@ -115,6 +201,19 @@ export class ConversationsService {
         senderId: currentUserId,
         receiverId,
         conversationId,
+      },
+    });
+
+    await this.prismaService.conversation.update({
+      where: {
+        id: conversationId,
+      },
+      data: {
+        lastMessage: {
+          connect: {
+            id: directMessage.id,
+          },
+        },
       },
     });
 

@@ -68,7 +68,7 @@ export class ChatGateway
 
   private async initializeUserConnection(user: JwtPayload, socket: Socket) {
     socket.data.user = user;
-    console.log(`Client connected: ${socket.id} user: ${user.userId}`);
+    this.logger.log(`Client connected: ${socket.id} user: ${user.userId}`);
   }
 
   private handleConnectionError(socket: Socket, error: Error): void {

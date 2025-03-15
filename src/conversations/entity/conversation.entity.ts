@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiHideProperty, ApiProperty } from '@nestjs/swagger';
 import { Conversation, DirectMessage } from '@prisma/client';
 
 export class ConversationEntity implements Conversation {
@@ -20,4 +20,7 @@ export class ConversationEntity implements Conversation {
 
   @ApiProperty()
   messages: DirectMessage[];
+
+  @ApiHideProperty()
+  lastMessageId: string;
 }
