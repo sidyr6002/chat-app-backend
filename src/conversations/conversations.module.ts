@@ -8,5 +8,6 @@ import { UsersModule } from 'src/users/users.module';
   imports: [PrismaModule, UsersModule],
   controllers: [ConversationsController],
   providers: [ConversationsService],
+  exports: [ConversationsService],
 })
 export class ConversationsModule {}

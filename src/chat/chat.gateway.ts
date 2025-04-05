@@ -1,4 +1,10 @@
-import { Logger, UnauthorizedException, UseFilters } from '@nestjs/common';
+import {
+  Logger,
+  UseFilters,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import {
   OnGatewayConnection,
@@ -10,10 +16,16 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { SocketExceptionFilter } from 'src/common/filters/socket-exception/socket-exception.filter';
+import { ConversationsService } from 'src/conversations/conversations.service';
 import { JwtPayload } from 'src/types/jwt-payload.type';
 
 @UseFilters(SocketExceptionFilter)
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: {
+    origin: new ConfigService().get<string>('FRONTEND_URL'),
+    credentials: true,
+  },
+})
 export class ChatGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
@@ -22,7 +34,10 @@ export class ChatGateway
 
   private readonly logger = new Logger('ChatGateway');
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly conversationsService: ConversationsService,
+  ) {}
 
   afterInit() {
     this.logger.log(`Initialized`);
@@ -41,15 +56,52 @@ export class ChatGateway
     this.logger.log(`Client id:${client.id} disconnected`);
   }
 
-  @SubscribeMessage('message')
-  handleMessage(client: any, payload: any) {
+  @SubscribeMessage('joinConversation')
+  async handleJoinConversation(client: Socket, conversationId: string) {
+    const user = client.data.user;
+
+    const conversation = await this.conversationsService.getConversation(
+      user.userId,
+      conversationId,
+    );
+
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
+    client.join(conversation.id);
+    this.logger.log(
+      `Client id: ${client.id} joined conversation: ${conversationId}`,
+    );
+  }
+
+  @SubscribeMessage('sendDirectMessage')
+  async handleDirectMessage(
+    client: Socket,
+    payload: { conversationId: string; message: string },
+  ) {
+    const user = client.data.user;
+    const currentUserId = user.userId;
+
     this.logger.log(`Message received from client id: ${client.id}`);
     this.logger.debug(`Payload: ${payload}`);
 
-    return {
-      event: 'pong',
-      data: 'Wrong data that will make the test fail',
-    };
+    const conversation = await this.conversationsService.getConversation(
+      user.userId,
+      payload.conversationId,
+    );
+
+    if (!conversation) {
+      throw new UnauthorizedException('Not part of this conversation');
+    }
+
+    const newMessage = await this.conversationsService.createMessage(
+      payload.conversationId,
+      currentUserId,
+      payload.message,
+    );
+
+    this.server.to(payload.conversationId).emit('message', newMessage);
   }
 
   private authenticateSocket(socket: Socket): JwtPayload {

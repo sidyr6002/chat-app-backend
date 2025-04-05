@@ -6,6 +6,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -16,8 +17,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { UserEntity } from './entities/user.entity';
-import { CuidValidatePipe } from 'src/cuid-validate/cuid-validate.pipe';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RequestWithUser } from 'src/common/interfaces/request-with-user.interface';
 
 @Controller('users')
 @ApiTags('users')
@@ -33,9 +34,13 @@ export class UsersController {
     return users.map((user) => new UserEntity(user));
   }
 
-  @Get(':id')
+  @Get('/me')
   @ApiOkResponse({ type: UserEntity })
-  async findOneById(@Param('id', CuidValidatePipe) id: string) {
+  async findOneById(@Req() req: RequestWithUser) {
+    const { id } = req.user;
+
+    console.log('User id: ', id);
+
     const user = await this.usersService.findOne({ id });
     return new UserEntity(user);
   }

@@ -13,6 +13,7 @@ import { BloomFiltersModule } from './bloom-filters/bloom-filters.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: '.env',
     }),
     PrismaModule,
     UsersModule,

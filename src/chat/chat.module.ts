@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { ChatGateway } from './chat.gateway';
+import { ConversationsModule } from 'src/conversations/conversations.module';
 
 @Module({
   imports: [
@@ -11,10 +12,11 @@ import { ChatGateway } from './chat.gateway';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: '1hr',
+          expiresIn: configService.get<string>('JWT_EXPIRATION', '15m'),
         },
       }),
     }),
+    ConversationsModule,
   ],
   providers: [ChatGateway],
 })

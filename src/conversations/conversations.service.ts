@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/users.service';
@@ -87,7 +92,7 @@ export class ConversationsService {
     });
 
     if (!conversations) {
-      throw new Error('Conversations not found');
+      throw new NotFoundException('Conversations not found');
     }
 
     return conversations.map(({ user1, user2, userId1, userId2, ...rest }) => {
@@ -113,25 +118,58 @@ export class ConversationsService {
       where: {
         id: conversationId,
       },
-      include: {
-        messages: true,
-      },
     });
 
     if (!conversation) {
-      throw new Error('Conversation not found');
+      throw new NotFoundException('Conversation not found');
     }
 
-    if (
-      currentUserId != conversation.userId1 &&
-      currentUserId != conversation.userId2
-    ) {
-      throw new Error('You are not a participant in this conversation');
+    if (![conversation.userId1, conversation.userId2].includes(currentUserId)) {
+      throw new UnauthorizedException(
+        'The user is not a participant in this conversation',
+      );
     }
 
     return conversation;
   }
 
+  async getConversationMessages(
+    currentUserId: string,
+    conversationId: string,
+    cursor?: string,
+    take: number = 20,
+  ) {
+    const conversation = await this.getConversation(
+      currentUserId,
+      conversationId,
+    );
+
+    const messages = await this.prismaService.directMessage.findMany({
+      where: {
+        conversationId: conversation.id,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: take + 1,
+      cursor: cursor ? { id: cursor } : undefined,
+    });
+
+    const hasNextPage = messages.length > take;
+    const trimmedMessages = hasNextPage ? messages.slice(0, take) : messages;
+    const nextCursor = hasNextPage ? messages[messages.length - 1].id : null;
+
+    return {
+      messages: trimmedMessages,
+      nextCursor,
+    };
+  }
+
+  /**
+   * Retrieves a list of conversations the current user is participating in, along with the last message
+   * sent in each conversation and the other participant.
+   *
+   */
   async getConversationsListWithLastMessage(currentUserId: string) {
     const conversations = await this.prismaService.conversation.findMany({
       where: {
@@ -172,7 +210,7 @@ export class ConversationsService {
   }
 
   /**
-   * Sends a direct message from the current user to the other participant in the given conversation.
+   * Creates a direct message from the current user to the other participant in the given conversation.
    *
    * @param conversationId - The ID of the conversation in which the message is to be sent.
    * @param currentUserId - The ID of the current user sending the message.
@@ -180,7 +218,7 @@ export class ConversationsService {
    * @throws {Error} - Throws an error if the conversation is not found or the user is not a participant.
    * @returns The newly created direct message object.
    */
-  async sendMessage(
+  async createMessage(
     conversationId: string,
     currentUserId: string,
     message: string,
